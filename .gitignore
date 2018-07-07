@@ -7,8 +7,10 @@
 /doc/html
 /doc/doxygen_*.db
 *.a
+.idea/
 
 # Temporary files created during CMake build
+cmake-build-debug/
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
