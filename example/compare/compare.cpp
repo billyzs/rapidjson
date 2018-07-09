@@ -7,6 +7,7 @@
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <set>
@@ -16,53 +17,7 @@
 
 using namespace rapidjson;
 using namespace std;
-static const string A {R"JSON(
-{
-    "foo" : false,
-    "obj": {"a" : 1},
-    "bar" : "baz"
-})JSON"};
 
-static const string B {R"JSON(
-{
-    "bar": "baz",
-    "foo" : false
-})JSON"};
-
-struct KeyExtractor : public BaseReaderHandler<UTF8<>, KeyExtractor> {
-    vector<string> m_keys{};
-    uint32_t level = 0;
-
-    bool Key(const char* str, SizeType length, bool copy) {
-        cout << "Key " << str  << endl;
-        (void) length; (void) copy;
-        if (level  == 1)
-            m_keys.emplace_back(str);
-        return true;
-    }
-
-    bool StartObject() {
-        ++level;
-        cout << "StartObject (level " << level << ")" << endl;
-        return true;
-    }
-
-    bool EndObject(SizeType) {
-        --level;
-        cout << "EndObject (level " << level << ")" << endl;
-        return true;
-    }
-
-    const vector<string>& get_keys() {
-        cout << "keys are: ";
-        for (const auto& k : m_keys)
-        {
-            cout << k << " ";
-        }
-        cout << endl;
-        return m_keys;
-    }
-};
 
 bool compare(const Value& A, const Value& B);
 
@@ -94,13 +49,19 @@ namespace details {
      * array elements that are string and arithmetic types can be compared easily by using std::set or map;
      *  array elements that are objects or arrays 
      */
-
     bool compare_arr(const Arr& A, const Arr& B) {
-        bool same = !B.Empty();
-        if (!A.Empty()) {
-            return same;
+        bool same;
+        if (A.Size() == B.Size() && !(A.Empty() || B.Empty())) {
+            auto eIterA = A.Begin();
+            while (B.End() != std::find_if(B.Begin(), B.End(),
+                                           [&eIterA](const Value& elemB) {
+                                               return compare(*(++eIterA), elemB);
+                                           }));
+
+            // done searching;
+            same =  (eIterA = A.End()); // that means all elements in A are in B
         } else {
-            same = !same;
+            same = (A.Empty() && B.Empty());
         }
         return same;
     }
@@ -124,110 +85,14 @@ bool compare(const Value& A, const Value& B) {
     else {
         return A == B;
     }
-
-    // assert? output diagnostic info?
 }
 
 
 
-// it only ever makes sense to compare 2 of the same type; comparisoin between different types always return false
-//
-//template <typename ArrayT = GenericArray<>>
-//bool compare(const ArrayT)
 
-//    StringStream ssA(A.c_str()), ssB(B.c_str());
-//    KeyExtractor aKeys, bKeys;
-//    Reader aReader, bReader;
-//    aReader.Parse(ssA, aKeys);
-//    bReader.Parse(ssB, bKeys);
+int main() {
+    cout << boolalpha;
 
-
-void json(){
-    Document aDoc, bDoc;
-    aDoc.Parse(A.c_str());
-    bDoc.Parse(B.c_str());
-
-    StringStream ssA(A.c_str()), ssB(B.c_str());
-    KeyExtractor aKeys, bKeys;
-    Reader aReader, bReader;
-    aReader.Parse(ssA, aKeys);
-    bReader.Parse(ssB, bKeys);
-    aKeys.get_keys();
-    bKeys.get_keys();
-
-    // GerArray()
-    const string ARR {R"JSON({"foo" : [1,2,3]})JSON"};
-    Document jARR; jARR.Parse(ARR.c_str());
-    auto jarr = jARR["foo"].GetArray();
-    static_assert(std::is_same<decltype(jarr), typename Value::Array>::value, "type must be same");
-
-    // what is the type of the element of an array? Value?
-    Document bjARR; bjARR.Parse("{\"foo\" : [3,2,1]}");
-    cout << "A, B equal? " << boolalpha << (bjARR == jARR) << endl;
-
-    // test operator== for number, bool and string
-    cout << "********* operator==(number, number) *********" << endl;
-
-    // number:
-    {
-        Value num1(static_cast<uint8_t>(3)), num2(3ul);
-        cout << "is number object? " << num1.IsObject() << endl;
-        if (num1.GetUint() == num2.GetUint()) {
-            cout << "compare number Values:: " << (num1 == num2) << endl;
-            cout << "compare number & string: " << (num1 == Value("3")) << endl;
-        }
-    }
-    // bool
-    {
-        Value b1(true), b3(true), b4(1ul);
-        cout << "is bool object? "<< b1.IsObject() << endl;
-        if (b1.GetBool() == b3.GetBool()) {
-            cout << "compare bool Values: " << (b1 == b3) << endl;
-            cout << "compare bool & uint " << (b1 == b4) << endl;
-        }
-    }
-    // string
-    {
-        Value s1("sds"), s2("sds"), s3("sds\t");
-        cout << "is string object? " << s1.IsObject() << endl;
-        if (s1.GetString() == s2.GetString()) {
-            cout << "compare string Values: " << (s1 == s2) << endl;
-            cout << "compare string Values with whitespace: " << (s1 == s3) << endl;
-        }
-    }
-
-    // can you call ObjectEmpty on something else? probably not
-    {
-        Value foo("3");
-        // cout << "object empty? " << foo.ObjectEmpty() << endl; // will assert
-    }
-
-    // how exactly does member iterator work?
-    {
-        string d {R"JSON(
-        {
-            "foo" : {
-                "bar" : false,
-                "baz" : 3
-            },
-            "woof" : true
-        })JSON"};
-        Document doc; doc.Parse(d.c_str());
-        StringBuffer sb;
-        Writer<StringBuffer> w(sb); doc.Accept(w);
-        cout << "********* inspecting obj *********" << endl;
-        cout << "doc : " << sb.GetString() << endl;
-        auto obj = doc.GetObject();
-        cout << "inspecting obj " << endl;
-        cout << "does obj have \"foo\" ? " << obj.HasMember("foo") << endl;
-        cout << "does obj have \"woof\" ? " << obj.HasMember("woof") << endl;
-        cout << "obj has : " << endl;
-        for (auto m = doc.MemberBegin(); m != doc.MemberEnd(); ++m) {
-            cout << m->name.GetString() << endl;
-        }
-
-    }
-    // compare() works on everything besides Array
     {
         string A_ {R"JSON(
         {
@@ -257,13 +122,6 @@ void json(){
         A.Parse(A_.c_str()); B.Parse(B_.c_str());
         cout << "compare(A, B): " << compare(A, B) << endl;
     }
-
-}
-
-int main() {
-    cout << boolalpha;
-
-    // KeyExtractor: array with nested objects
 
     return 0;
 }
