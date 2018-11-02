@@ -1,6 +1,7 @@
 include(CheckCXXCompilerFlag)
 
 set(UNITTEST_SOURCES
+    ctv.cpp
 	allocatorstest.cpp
     bigintegertest.cpp
     documenttest.cpp
