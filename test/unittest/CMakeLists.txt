@@ -1,7 +1,6 @@
 include(CheckCXXCompilerFlag)
 
 set(UNITTEST_SOURCES
-    ctv.cpp
 	allocatorstest.cpp
     bigintegertest.cpp
     documenttest.cpp
@@ -26,7 +25,12 @@ set(UNITTEST_SOURCES
     strtodtest.cpp
     unittest.cpp
     valuetest.cpp
-    writertest.cpp)
+    writertest.cpp
+)
+find_package(Boost 1.68)
+if (Boost_FOUND)
+    set(UNITTEST_SOURCES "test-json-getter.cpp;${UNITTEST_SOURCES}")
+endif()
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)

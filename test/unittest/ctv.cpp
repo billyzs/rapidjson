@@ -78,7 +78,7 @@ namespace details {
 /// @tparam SrcType the type of data to copy; usually either rapidjson::Value or rapidjson::Document
 /// @param value to be copied
 /// @note we don't use GenericValue or GenericDocument, so I didn't bother to make this more generic
-/// @note there's no meaningful way to copy Value without an allocator, so just use the Copy ctor From document.h
+/// @note there's no meaningful way to copy Value without an allocator; for that, use the copy ctor From document.h
 template <typename SrcType>
 [[nodiscard]]
 rapidjson::Document copy_from(const SrcType& value) {
@@ -87,6 +87,8 @@ rapidjson::Document copy_from(const SrcType& value) {
     return retval;
 }
 
+/// @brief overload getters for ConstObject
+/// @note chose to return an optional because there's no default ctor for ConstObjects
 std::optional<rapidjson::Value::ConstObject>
 get(const rapidjson::Value& val) noexcept {
     return val.IsObject() ? std::make_optional(val.GetObject()) : std::nullopt;
